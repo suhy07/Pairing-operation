@@ -1,7 +1,4 @@
-﻿var PAGE_ID_NAME = 'id';
-var PAGE_URL_NAME = 'p';
-var SITEMAP_COLLAPSE_VAR_NAME = 'c';
-var PLUGIN_VAR_NAME = 'g';
+﻿var PLUGIN_VAR_NAME = 'g';
 var FOOTNOTES_VAR_NAME = 'fn';
 var ADAPTIVE_VIEW_VAR_NAME = 'view';
 var SCALE_VAR_NAME = 'sc';
@@ -11,15 +8,10 @@ var CLOUD_VAR_NAME = 'cl';
 var TRACE_VAR_NAME = 'tr';
 var RP_VERSION = 9;
 var lastLeftPanelWidth = 220;
-var lastRightPanelWidth = 220;
+var lastRightPanelWidth = 290;
 var lastLeftPanelWidthDefault = 220;
-var lastRightPanelWidthDefault = 220;
+var lastRightPanelWidthDefault = 290;
 var toolBarOnly = true;
-// TODO: need to find a way to get rid of iphone X hacks!!!
-// - could possibly have app detect iphone and send information back to player, but currently, that information would arrive too late
-var iphoneX = false;
-var iphoneXFirstPass = true;
-
 
 // isolate scope
 (function () {
@@ -41,7 +33,6 @@ var iphoneXFirstPass = true;
     var isCloud = $axure.player.isCloud = getHashStringVar(CLOUD_VAR_NAME);
     if (isCloud) {
         $("#topPanel").css('display', 'none');
-        lastRightPanelWidthDefault = 290;
     }else {
         $("#topPanel").css('display', '');
     }
@@ -58,8 +49,8 @@ var iphoneXFirstPass = true;
         _settings.loadSitemap = configuration.loadSitemap;
         _settings.loadFeedbackPlugin = configuration.loadFeedbackPlugin;
         var cHash = getHashStringVar(SITEMAP_COLLAPSE_VAR_NAME);
-        _settings.startCollapsed = cHash == "1";
-        if (cHash == "2") closePlayer();
+        _settings.startCollapsed = cHash == SITEMAP_COLLAPSE_VALUE;
+        if (cHash == SITEMAP_CLOSE_VALUE) closePlayer();
         var gHash = getHashStringVar(PLUGIN_VAR_NAME);
         _settings.startPluginGid = gHash;
 
@@ -109,15 +100,23 @@ var iphoneXFirstPass = true;
             (SAFARI && BROWSER_VERSION < 602) || // Minor version 10
             (FIREFOX && BROWSER_VERSION < 57) || // Support Quantum 
             ($axure.browser.isEdge && BROWSER_VERSION < 15) || // 15 for mobile devices (else could go 16, possibly 17)
-            IE_10_AND_BELOW) {
+            (!$axure.browser.isEdge && IE)) {
             if (!QQ && !UC) appendOutOfDateNotification();
         }
 
         if (CHROME_5_LOCAL && !$('body').attr('pluginDetected')) {
             window.location = 'resources/chrome/chrome.html';
         }
-    });
 
+        if (FIREFOX && BROWSER_VERSION >= 68 && document.location.href.indexOf('file://') >= 0) { //detecting firefox and local
+            window.location = 'resources/chrome/firefox.html';
+        }
+    });
+    
+    $(window).on('hashchange', function() {
+        window.location.reload();
+    });
+    
     function appendOutOfDateNotification() {
         var toAppend = '';
         toAppend += '<div id="browserOutOfDateNotification">';
@@ -135,9 +134,6 @@ var iphoneXFirstPass = true;
         toAppend += '       </div>';
         toAppend += '       <div class="browserContainer">';
         toAppend += '           <div class="browserName">Apple Safari</div><div class="browserSupportedVersion">v10 and later</div>';
-        toAppend += '       </div>';
-        toAppend += '       <div class="browserContainer">';
-        toAppend += '           <div class="browserName">Internet Explorer</div><div class="browserSupportedVersion">v11 and later</div>';
         toAppend += '       </div>';
         toAppend += '   </div>';
         toAppend += '   <div id="browserOutOfDateNotificationButtons">'
@@ -262,7 +258,6 @@ var iphoneXFirstPass = true;
             // IOS often does not complete updating innerHeight and innerWidth
             // until after calling orientation changed and resized window
             // Also, cannot use $(window).height() call since iOS11 needs padding amount
-            iphoneXFirstPass = false
             if (IOS && isMobileMode()) setTimeout(function () { $axure.player.resizeContent(true); }, 250);
         });
 
@@ -296,7 +291,8 @@ var iphoneXFirstPass = true;
         }
 
         if($axure.player.settings != null && !$axure.player.settings.isExpo) {
-            mainFrame.contentWindow.location.href = getInitialUrl();
+            const linkUrlWithVars = $axure.getLinkUrlWithVars(getInitialUrl());
+            mainFrame.contentWindow.location.href = linkUrlWithVars;
         }
     }
 
@@ -323,7 +319,7 @@ var iphoneXFirstPass = true;
         // map devices to their corresponding frame/bezel/overlays
     }
     var wasMobile = false;
-    var isMobileMode = $axure.player.isMobileMode = function () { return isShareApp() || (MOBILE_DEVICE && $(window).width() < 420); }
+    var isMobileMode = $axure.player.isMobileMode = function () { return $axure.utils.isShareApp() || (MOBILE_DEVICE && $(window).width() < 420); }
     var isMobileTextEntry = false;
 
     var isViewOverridden = $axure.player.isViewOverridden = function() {
@@ -380,15 +376,13 @@ var iphoneXFirstPass = true;
 
         if (isMobileMode()) {
             $container.addClass('mobileMode');
-            $('.noDiscussionText span').text('Comments added in Axure Cloud will appear here');
         } else {
             $container.removeClass('mobileMode');
-            $('.noDiscussionText span').text('Either select the button above to post to a location on the page, or use the field to post without location.');
         }
     }
 
     $axure.player.updatePlugins = function updatePlugins() {
-        if (MOBILE_DEVICE && !isShareApp()) {
+        if (MOBILE_DEVICE && !$axure.utils.isShareApp()) {
             var hostPanelPadding = isMobileMode() ? '8px 15px 0px 15px' : '';
             $('.rightPanel .leftPanel .mobileOnlyPanel').css('padding', hostPanelPadding);
         }
@@ -416,7 +410,7 @@ var iphoneXFirstPass = true;
 
     function deactivateMobileTextEntry() {
         newHeight = window.innerHeight;
-        var newControlHeight = newHeight - (!isShareApp() ? 140 : IOS ? 157 : 138);
+        var newControlHeight = newHeight - (!$axure.utils.isShareApp() ? 140 : IOS ? 157 : 138);
 
         if (!$('.leftPanel').hasClass('popup')) {
             $('.leftPanel').height(newControlHeight);
@@ -430,8 +424,8 @@ var iphoneXFirstPass = true;
         $('#mobileControlFrameContainer').hide();
 
         newHeight = window.innerHeight;
-        var newControlHeight = newHeight - (!isShareApp() ? 140 : IOS ? 157 : 138);
-        newControlHeight = newControlHeight + (!isShareApp() ? 61 : IOS ? 72 : 60);
+        var newControlHeight = newHeight - (!$axure.utils.isShareApp() ? 140 : IOS ? 157 : 138);
+        newControlHeight = newControlHeight + (!$axure.utils.isShareApp() ? 61 : IOS ? 72 : 60);
 
         if (!$('.leftPanel').hasClass('popup')) {
             $('.leftPanel').height(newControlHeight);
@@ -452,9 +446,6 @@ var iphoneXFirstPass = true;
 
     $axure.player.resizeContent = function (noViewport) {
         var isMobile = isMobileMode();
-
-        var $left = $('.leftPanel');
-        var $right= $('.rightPanel');
 
         if (wasMobile && !isMobile) {
             $('#clippingBoundsScrollContainer').show();
@@ -500,20 +491,10 @@ var iphoneXFirstPass = true;
 
         var newHeight = 0;
         var newWidth = 0;
-        if (iphoneX && isShareApp()) {
+        if (IOS && $axure.utils.isShareApp()) {
             // Hack for Iphone X
-            newHeight = $(window).height() - ((!isMobile && $('#topPanel').is(':visible')) ? $('#topPanel').height() : 0);
+            newHeight = iosInnerHeight();
             newWidth = $(window).width();
-            // This does not need to make sense, since it is Iphone X
-            var notchAndHomeOffsetPortrait = iphoneXFirstPass ? 35 : 5;
-            var notchOffsetLandscape = iphoneXFirstPass ? 45 : 10;
-            var homeButtonOffsetLandscape = iphoneXFirstPass ? 21 : 10;
-            if (newHeight > newWidth) {
-                newHeight = newHeight + notchAndHomeOffsetPortrait;
-            } else {
-                newWidth = newWidth + notchOffsetLandscape * 2;
-                newHeight = newHeight + homeButtonOffsetLandscape;
-            }
         } else {
             // innerHeight includes padding for window -- needed in iOS 11 to have prototype stretch to bottom of screen (could put in -- if (iOS) -- block if needed)
             //var newHeight = $(window).height() - ((!isMobile && $('#topPanel').is(':visible'))? $('#topPanel').height() : 0);
@@ -528,12 +509,12 @@ var iphoneXFirstPass = true;
         if (isMobile) {
             $('#mobileControlFrameContainer').height(newHeight);
             $('#mobileControlFrameContainer').width(newWidth);
-            var newControlHeight = newHeight - (!MOBILE_DEVICE ? 112 : !isShareApp() ? 140 : IOS ? 157 : 138);
+            var newControlHeight = newHeight - (!MOBILE_DEVICE ? 112 : !$axure.utils.isShareApp() ? 140 : IOS ? 157 : 138);
             // Screen resize is only way through browser to catch mobile device keyboard expand and collapse
             if ($('#mHideSidebar').is(':visible') && !$('#mobileControlFrameContainer').is(':visible')) {
                 $('#mobileControlFrameContainer').delay(150).show();
             } else if (isMobileTextEntry) {
-                newControlHeight = newControlHeight + (!isShareApp() ? 61 : IOS ? 72 : 60);
+                newControlHeight = newControlHeight + (!$axure.utils.isShareApp() ? 61 : IOS ? 72 : 60);
                 $('#mobileControlFrameContainer').hide();
             }
 
@@ -548,15 +529,24 @@ var iphoneXFirstPass = true;
             }
             $('.rightPanel').css('height', '');
             if ($('.rightPanel').is(':visible')) {
-                var newWidth = Math.min($(window).width() - lastRightPanelWidthDefault, $('.rightPanel').width(), $(window).width() - $('.leftPanel').width());
+                var lastRightPanelWidthDefaultSub = ($(window).width() - lastRightPanelWidthDefault || 0);
+                var rightPanelWidth = ($('.rightPanel').width() || 0);
+                var leftPanelPanelWidthSub = ($(window).width() - $('.leftPanel').width()) || 0;
+
+                var newWidth = Math.min(lastRightPanelWidthDefaultSub, rightPanelWidth, leftPanelPanelWidthSub);
                 lastRightPanelWidth = Math.max(lastRightPanelWidthDefault, newWidth);
-                $('.rightPanel').width(lastRightPanelWidth != 0 ? lastRightPanelWidth : lastRightPanelWidthDefault);
+                $('.rightPanel').width(lastRightPanelWidth ? lastRightPanelWidth : lastRightPanelWidthDefault);
                 $('#rsplitbar').css('left', $(window).width() - $('.rightPanel').width());
             }
             if ($('.leftPanel').is(':visible')) {
-                var newWidth = Math.min($(window).width() - lastLeftPanelWidthDefault, $('.leftPanel').width(), $(window).width() - $('.rightPanel').width());
+                var lastLeftPanelWidthSub = ($(window).width() - lastLeftPanelWidthDefault || 0);
+                var leftPanelWidth = ($('.leftPanel').width() || 0);
+                var rightPanelWidthSub = ($(window).width() - $('.rightPanel').width()) || 0;
+
+                var newWidth = Math.min(lastLeftPanelWidthSub, leftPanelWidth, rightPanelWidthSub);
+
                 lastLeftPanelWidth = Math.max(lastLeftPanelWidthDefault, newWidth);
-                $('.leftPanel').width(lastLeftPanelWidth != 0 ? lastLeftPanelWidth : lastLeftPanelWidthDefault);
+                $('.leftPanel').width(lastLeftPanelWidth ? lastLeftPanelWidth : lastLeftPanelWidthDefault);
                 $('#lsplitbar').css('left', $('.leftPanel').width() - 4);
             }
         }
@@ -657,6 +647,14 @@ var iphoneXFirstPass = true;
         var $iframe = $($('#mainPanel').find('iframe')[0].contentWindow);
         var selectedScale = $('.vpScaleOption').find('.selectedRadioButton');
         var scaleVal = $(selectedScale).parent().attr('val');
+
+        var dimStr = $('.currentAdaptiveView').attr('data-dim');
+        var dim = dimStr ? dimStr.split('x') : { w: '0', h: '0' };
+        var isDevice = dim[1] != '0' ? true : false;
+        // This line is necessary for right handling DEFAULT SCALE
+        // Because default scale relates to scale-to-fit item for device projects
+        if (scaleVal == '0' && isDevice) scaleVal = 2;
+
         var scale = $('#mainPanelContainer').css('transform');;
         scale = (scale == "none") ? 1 : Number(scale.substring(scale.indexOf('(') + 1, scale.indexOf(',')));
 
@@ -680,6 +678,9 @@ var iphoneXFirstPass = true;
         var isCentered = $($iframe[0].document.body).css('position') == 'relative';
         if (isCentered && scaleVal == 1) leftPos = 0;
         else if (isCentered && scaleVal == 2) leftPos = $('#mainPanelContainer').width() * scale / 2.0 - contentLeftOfOriginOffset;
+
+        // Include clipFrameScroll offset in mainPanelContainer
+        topPos += (parseFloat($('#clipFrameScroll').css("top")) || 0) * scale;
 
         return {
             left: leftPos,
@@ -835,7 +836,7 @@ var iphoneXFirstPass = true;
             $('.leftPanel').removeClass('popup');
             if(!isMobileMode()) {
                 isAnimating = true;
-                var newWidth = (lastLeftPanelWidth != 0 ? lastLeftPanelWidth : lastLeftPanelWidthDefault);
+                var newWidth = (lastLeftPanelWidth ? lastLeftPanelWidth : lastLeftPanelWidthDefault);
                 var clippingWidth = calculateClippingBoundsWidth(newWidth, true);
                 var newLeft = calculateScrollLeftWithOffset(-newWidth, true);
 
@@ -857,14 +858,17 @@ var iphoneXFirstPass = true;
                     }});
             }
         } else {
-            if($('#rsplitbar').is(':visible')) {
+            if ($('#rsplitbar').is(':visible')) {
+                // update width of rightPanel plugin
+                var newWidth = lastRightPanelWidth ? lastRightPanelWidth : lastRightPanelWidthDefault;
+                $('#' + hostId).width(newWidth);
                 $('#' + hostId).show();
                 $axure.player.pluginVisibleChanged(hostId, true);
                 return;
             }
             if (!isMobileMode()) {
                 isAnimating = true;
-                var newWidth = lastRightPanelWidth != 0 ? lastRightPanelWidth : lastRightPanelWidthDefault;
+                var newWidth = lastRightPanelWidth ? lastRightPanelWidth : lastRightPanelWidthDefault;
                 var clippingWidth = calculateClippingBoundsWidth(newWidth, false);
                 var newLeft = calculateScrollLeftWithOffset(-newWidth, false);
 
@@ -906,8 +910,16 @@ var iphoneXFirstPass = true;
         var h = dim[1] != '0' ? dim[1] : '';
 
         var scaleVal = $('.vpScaleOption').find('.selectedRadioButton').parent().attr('val');
+        var selectedScaleValue = scaleVal;
         $axure.player.noFrame = false;
         if (h && scaleVal == 1) $axure.player.noFrame = true;
+
+        $('#mainPanelContainer').attr({
+            "data-scale-n": scaleVal,
+            "data-page-dimensions-type": h ? "device" : w ? "web" : "auto",
+            "data-scale-shift-x": null,
+            "data-scale-shift-y": null,
+        });
 
         var clipToView = h && !$axure.player.noFrame;
         var isDevice = h;
@@ -919,9 +931,9 @@ var iphoneXFirstPass = true;
         if (!h || !clipToView) h = mainPanelHeight;
         if (MOBILE_DEVICE && h > mainPanelHeight) h = mainPanelHeight;
         if (MOBILE_DEVICE && w > mainPanelWidth) w = mainPanelWidth;
-
+        
         if (clipToView) {
-            if (scaleVal == '0') scaleVal = 2;
+            if (!MOBILE_DEVICE && scaleVal == '0') scaleVal = 2;
 
             w = Number(w);
             h = Number(h);
@@ -931,25 +943,31 @@ var iphoneXFirstPass = true;
             $('#mainFrame').height(h);
             $('#clipFrameScroll').height(h);
 
-            var topPadding = 10;
+            var topPadding = MOBILE_DEVICE ? 0 : 10;
             var leftPadding = 0;
             var rightPadding = 0;
-            var bottomPadding = 10;
+            var bottomPadding = MOBILE_DEVICE ? 0 : 10;
 
-            if (!MOBILE_DEVICE) {
-                w = w + leftPadding + rightPadding;
-                h = h + topPadding + bottomPadding;
-            }
+            w = w + leftPadding + rightPadding;
+            h = h + topPadding + bottomPadding;
 
             var x = (mainPanelWidth - w) / 2;
             var y = (mainPanelHeight - h) / 2 - 1;
 
-            x = Math.max(0, x);
-            if (scaleVal != 2) y = Math.max(0, y);
+            if (scaleVal != 2) {
+                x = Math.max(0, x);
+                y = Math.max(0, y);
+            }
+            
+            $('#mainPanelContainer').attr({
+                "data-scale-shift-x": x,
+                "data-scale-shift-y": y,
+            });
 
             $('#mainPanelContainer').css({
                 'margin': 'auto',
-                'top': y + 'px'
+                'top': y + 'px',
+                'left': (x < 0 ? x + 'px' : 'auto')
             });
 
             $('#clipFrameScroll').css({
@@ -1001,7 +1019,9 @@ var iphoneXFirstPass = true;
             clipToView: clipToView
         };
         $axure.messageCenter.postMessage('getScale', vpScaleData);
-
+        $axure.messageCenter.postMessage('cloud_ScaleValueChanged', {
+            scale: selectedScaleValue,
+        });
         if (scaleVal == '0' && clipToView) $('#mainPanel').css('overflow', 'auto');
         else $('#mainPanel').css('overflow', '');
     }
@@ -1101,8 +1121,64 @@ var iphoneXFirstPass = true;
     function isSafari() {
         // Safari 3.0+ "[object HTMLElementConstructor]" 
         var liveSafari = /constructor/i.test(window.HTMLElement) || (function (p) { return p.toString() === "[object SafariRemoteNotification]"; })(!window['safari'] || (typeof safari !== 'undefined' && safari.pushNotification));
-        return liveSafari || SAFARI || (IOS && isShareApp());
+        return liveSafari || SAFARI || (IOS && $axure.utils.isShareApp());
     };
+
+    var iosInnerHeight = (function () {
+        if (!navigator.userAgent.match(/iphone|ipod|ipad/i)) {
+            /**
+             * Avoids conditional logic in the implementation
+             * @return {number} - window's innerHeight measurement in pixels
+             */
+            return function () {
+                return window.innerHeight;
+            };
+        }
+
+        // Store initial orientation
+        var axis = Math.abs(window.orientation);
+        // And hoist cached dimensions
+        var dims = { w: 0, h: 0 };
+
+        /**
+         * Creates an element with a height of 100vh since iOS accurately
+         * reports vp height (but not window.innerHeight). Then destroy it.
+         */
+        var createRuler = function () {
+            var ruler = document.createElement('div');
+
+            ruler.style.position = 'fixed';
+            ruler.style.height = '100vh';
+            ruler.style.width = 0;
+            ruler.style.top = 0;
+
+            document.documentElement.appendChild(ruler);
+
+            // Set cache conscientious of device orientation
+            dims.w = axis === 90 ? ruler.offsetHeight : window.innerWidth;
+            dims.h = axis === 90 ? window.innerWidth : ruler.offsetHeight;
+
+            // Clean up after ourselves
+            document.documentElement.removeChild(ruler);
+            ruler = null;
+        };
+
+        // Measure once
+        createRuler();
+
+        /**
+         * Returns window's cached innerHeight measurement
+         * based on viewport height and device orientation
+         * @return {number} - window's innerHeight measurement in pixels
+         */
+        return function () {
+            if (Math.abs(window.orientation) !== 90) {
+                return dims.h;
+            }
+
+            return dims.w;
+        };
+    }());
 
     function includeTokens(ajaxData, excludeUser) {
         //If the authCookieValue is set (a password-protected local prototype), then send the
@@ -1122,9 +1198,9 @@ var iphoneXFirstPass = true;
             if (safariAuthResponseProfile) response = safariAuthResponseProfile;
             userAcct.userId = response.userId;
             if (safariAuthResponseProfile) 
-                userAcct.userName = response.username == null || response.username.trim() === '' ? response.userEmail : decodeURIComponent(response.username.trim());
+                userAcct.userName = response.username == null || response.username.trim() === '' ? response.userEmail : response.username.trim();
             else
-                userAcct.userName = response.nickname == null || response.nickname.trim() === '' ? response.userEmail : decodeURIComponent(response.nickname.trim());
+                userAcct.userName = response.nickname == null || response.nickname.trim() === '' ? response.userEmail : response.nickname.trim();
             userAcct.userEmail = response.userEmail;
             userAcct.userProfileImg = response.profileImageUrl;
             userAcct.isUsingAxureAcct = true;
@@ -1200,9 +1276,7 @@ var iphoneXFirstPass = true;
                 } else {
                     failure(response);
                 }
-            });
-            // TODO: add ldap authentication
-            //}, window.ON_PREM_LDAP_ENABLED);
+            }, window.ON_PREM_LDAP_ENABLED);
         } else {
             failure();
         }
@@ -1504,22 +1578,10 @@ var iphoneXFirstPass = true;
                     // Could stop automatic scaling on Ipads as well that we actually want, but for now, seems fine
                     $('body').css('-webkit-text-size-adjust', '100%');
 
-                    // Prepare for Iphone X hacks
-                    // Link for dimensions: https://kapeli.com/cheat_sheets/iOS_Design.docset/Contents/Resources/Documents/index
-                    var ratio = window.devicePixelRatio || 1;
-                    // Regular iphoneX
-                    if (IOS && window.screen.width * ratio == 1125 && window.screen.height * ratio === 2436) {
-                        iphoneX = true;
-                    }
-                    // Iphone XS Max and Iphone XR
-                    if (IOS && window.screen.width == 414 && window.screen.height === 896) {
-                        iphoneX = true;
-                    }
-
                     window.addEventListener("orientationchange", function () {
                         var viewport = document.querySelector("meta[name=viewport]");
                         //so iOS doesn't zoom when switching back to portrait
-                        if (iphoneX) {
+                        if (IOS) {
                             viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover');
                             viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, viewport-fit=cover');
                         } else {
@@ -1623,7 +1685,7 @@ var iphoneXFirstPass = true;
 
         $('#mobileControlFrameContainer').append(toAppend);
 
-        var barHeight = IOS ? (iphoneX ? '82px' : '72px') : '60px';
+        var barHeight = IOS ? '72px' : '60px';
         var returnIconDisplacement = IOS ? '-15px': '-20px';
         var iconTopMargin = IOS ? '14px': '7px';
         var returnTextTopMargin = IOS ? '9px': '7px';
@@ -1721,7 +1783,7 @@ var iphoneXFirstPass = true;
         var currentX = window.event.pageX;
         var newWidth = Math.min(startSplitWidth + currentX - startSplitX, $(window).width() - $('.rightPanel').width(), $(window).width() - lastRightPanelWidthDefault);
         lastLeftPanelWidth = Math.max(lastLeftPanelWidthDefault, newWidth);
-        $('.leftPanel').width(lastLeftPanelWidth != 0 ? lastLeftPanelWidth : lastLeftPanelWidthDefault);
+        $('.leftPanel').width(lastLeftPanelWidth ? lastLeftPanelWidth : lastLeftPanelWidthDefault);
         $('#lsplitbar').css('left', $('.leftPanel').width() - 4);
         $axure.player.updateClippingBoundsWidth();
         $axure.player.refreshViewPort();
@@ -1731,7 +1793,7 @@ var iphoneXFirstPass = true;
         var currentX = window.event.pageX;
         var newWidth = Math.min(startSplitWidth - currentX + startSplitX, $(window).width() - $('.leftPanel').width(), $(window).width() - lastLeftPanelWidthDefault);
         lastRightPanelWidth = Math.max(lastRightPanelWidthDefault, newWidth);
-        $('.rightPanel').width(lastRightPanelWidth != 0 ? lastRightPanelWidth : lastRightPanelWidthDefault);
+        $('.rightPanel').width(lastRightPanelWidth ? lastRightPanelWidth : lastRightPanelWidthDefault);
         $('#rsplitbar').css('left', $(window).width() - $('.rightPanel').width());
         $axure.player.updateClippingBoundsWidth();
         $axure.player.refreshViewPort();
@@ -1859,13 +1921,18 @@ var iphoneXFirstPass = true;
         var $pins = $('#existingPinsOverlay').children();
         for (var i = 0; i < $pins.length; i++) {
             // calculate new position of pin
-            const left = parseFloat($($pins[i]).css('left'));
-            const top = parseFloat($($pins[i]).css('top'));
+            const left = parseFloat($($pins[i]).attr('data-x'));
+            const top = parseFloat($($pins[i]).attr('data-y'));
             const width = $($pins[i]).width();
             const height = $($pins[i]).height();
-            // we should scale center of pin instead of left top corner
-            const scaledLeft = ((left + (width / 2)) * data.scaleN / data.prevScaleN) - (width / 2);
-            const scaledTop = ((top + (height / 2)) * data.scaleN / data.prevScaleN) - (height / 2);
+
+            // Get current scale of mainPanelContainer
+            // MainPanelContainer scaled without setContentScale message
+            var scale = $('#mainPanelContainer').css('transform');
+            scale = (scale == "none") ? 1 : Number(scale.substring(scale.indexOf('(') + 1, scale.indexOf(',')));
+            const scaledLeft = (left * scale) - (width / 2);
+            const scaledTop = (top * scale) - (height / 2);
+
 
             $($pins[i]).css('left', scaledLeft + 'px');
             $($pins[i]).css('top', scaledTop + 'px');
@@ -1883,7 +1950,7 @@ var iphoneXFirstPass = true;
         } else if (message == 'setContentScale') {
             if (data.clipToView) {
                 var scaleVal = $('.vpScaleOption').find('.selectedRadioButton').parent().attr('val');
-                if (scaleVal == '2' || scaleVal == '0') {
+                if (scaleVal == '2' || (!MOBILE_DEVICE && scaleVal == '0')) {
                     var scaleN = newScaleN = $('#mainPanel').width() / data.viewportWidth;
                     var hScaleN = ($('#mainPanel').height()) / data.viewportHeight;
                     if (hScaleN < scaleN) scaleN = newScaleN = hScaleN;
@@ -1925,6 +1992,25 @@ var iphoneXFirstPass = true;
         }
     }
 
+    function loadVariablesFromUrl(removeVarFromUrl) {
+        let originalHashValues = window.location.href.substr(window.location.href.indexOf('#')) || '';
+        let variables = {};
+        const query = (originalHashValues.split(GLOBAL_VAR_NAME)[1] || '');
+        
+        if(query.length > 0) {
+            $axure.utils.parseGlobalVars(query, function(varName, varValue) {
+                variables[varName] = varValue;
+            });
+            
+            if(removeVarFromUrl) {
+                originalHashValues = originalHashValues.replace(GLOBAL_VAR_NAME, "").replace(query, "");
+                replaceHash(originalHashValues);
+            }
+        }
+
+        return variables;
+    }
+    
     function getInitialUrl() {
         var shortId = getHashStringVar(PAGE_ID_NAME);
         var foundById = [];
@@ -2043,15 +2129,11 @@ var iphoneXFirstPass = true;
         }
     }
 
-    // This will return true if prototype is opened from version of app after update with code that sets this value 
-    // (won't be able to distinguish between browser and outdated app)
-    var isShareApp = function () { return /ShareApp/.test(navigator.userAgent); }
-
     function expand() {
         if ($axure.player.isMobileMode()) {
             $('#mHideSidebar').show();
             $('#mobileControlFrameContainer').show();
-            isShareApp() ? $('#nativeAppControlFrame').show() : $('#mobileBrowserControlFrame').show();
+            $axure.utils.isShareApp() ? $('#nativeAppControlFrame').show() : $('#mobileBrowserControlFrame').show();
         } else {
             $minimizeContainer = $('#interfaceControlFrameMinimizeContainer');
             $minimizeContainer.removeClass('collapseHovered');
@@ -2098,39 +2180,8 @@ var iphoneXFirstPass = true;
         return querystr;
     }
     
-    function setHashStringVar(currentHash, varName, varVal) {
-        var varWithEqual = varName + '=';
-        var poundVarWithEqual = varVal === '' ? '' : '#' + varName + '=' + varVal;
-        var ampVarWithEqual = varVal === '' ? '' : '&' + varName + '=' + varVal;
-        var hashToSet = '';
-
-        var pageIndex = currentHash.indexOf('#' + varWithEqual);
-        if (pageIndex == -1) pageIndex = currentHash.indexOf('&' + varWithEqual);
-        if (pageIndex != -1) {
-            var newHash = currentHash.substring(0, pageIndex);
-
-            newHash = newHash == '' ? poundVarWithEqual : newHash + ampVarWithEqual;
-
-            var ampIndex = currentHash.indexOf('&', pageIndex + 1);
-            if (ampIndex != -1) {
-                newHash = newHash == '' ? '#' + currentHash.substring(ampIndex + 1) : newHash + currentHash.substring(ampIndex);
-            }
-            hashToSet = newHash;
-        } else if (currentHash.indexOf('#') != -1) {
-            hashToSet = currentHash + ampVarWithEqual;
-        } else {
-            hashToSet = poundVarWithEqual;
-        }
-
-        if (hashToSet != '' || varVal == '') {
-            return hashToSet;
-        }
-
-        return null;
-    }
-
     $axure.player.setVarInCurrentUrlHash = function(varName, varVal) {
-        var newHash = setHashStringVar(window.location.hash, varName, varVal);
+        var newHash = $axure.utils.setHashStringVar(window.location.hash, varName, varVal);
 
         if (newHash != null) {
             replaceHash(newHash);
@@ -2167,7 +2218,7 @@ var iphoneXFirstPass = true;
         if (newHash != null) {
             replaceHash(newHash);
         }
-    }
+    };
 
     function setUpController() {
 
@@ -2186,8 +2237,10 @@ var iphoneXFirstPass = true;
         //Global Var array, getLinkUrl function and setGlobalVar listener are
         //for use in setting global vars in page url string when clicking a 
         //page in the sitemap
+        //NEW: this is now also used when navigating to a new window/popup,
+        //if there are global variables on the urls
         //-----------------------------------------
-        var _globalVars = {};
+        var _globalVars = loadVariablesFromUrl(true);
 
         //-----------------------------------------
         //Used by getLinkUrl below to check if local server is running 
@@ -2355,7 +2408,7 @@ var iphoneXFirstPass = true;
         }
 
         _player.pluginVisibleChanged = function(hostId, visible) {
-            if ($axure.player.isCloud && plugins[hostId]) {
+            if (plugins[hostId]) {
                 $axure.messageCenter.postMessage('pluginVisibleChanged', { id: hostId, gid: plugins[hostId].gid, visible: visible });
             }
         }
@@ -2438,6 +2491,11 @@ var iphoneXFirstPass = true;
             $(document).trigger('pluginShown', [getVisiblePlugins()]);
         };
 
+        _player.navigateToIssue = function (issueId) {
+            if (typeof feedback !== 'undefined') {
+                feedback.navigateToIssue(issueId);
+            }
+        };
     }
 
 

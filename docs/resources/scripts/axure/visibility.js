@@ -108,7 +108,31 @@
         //set ref visibility for ref of flow shape, if that exists
         var ref = document.getElementById(elementId + '_ref');
         if(ref) _visibility.SetVisible(ref, options.value);
+
+        if(options.value && !MOBILE_DEVICE && $ax.adaptive.isDeviceMode()) _updateMobileScrollForWidgetShown(axObj);
     };
+
+    var _updateMobileScrollForWidgetShown = function(widget) {
+        var isPanel = $ax.public.fn.IsDynamicPanel(widget.type);
+        var isLayer = $ax.public.fn.IsLayer(widget.type);
+        if (isPanel) {
+            var elementId = $id(widget);
+            var stateId = $ax.repeater.applySuffixToElementId(elementId, '_state0');
+            $ax.dynamicPanelManager.updateMobileScroll(elementId, stateId, true);
+            if (!widget.diagrams) return;
+            for (var i = 0; i < widget.diagrams.length; ++i) {
+                var diagram = widget.diagrams[i];
+                if (!diagram.objects) continue;
+                for (var j = 0; j < diagram.objects.length; ++j) {
+                    _updateMobileScrollForWidgetShown(diagram.objects[j]);
+                }
+            }
+        } else if (isLayer) {
+            for (var i = 0; i < widget.objs.length; ++i) {
+                _updateMobileScrollForWidgetShown(widget.objs[i]);
+            }
+        }
+    }
 
     var _setVisibility = function(parentId, childId, options, preserveScroll) {
         var wrapped = $jobj(childId);
@@ -536,7 +560,7 @@
         };
 
         if(useAnimationFrame) {
-            if (FIREFOX) $('body').hide().show(0); //forces FF to render the animation            
+            if(FIREFOX || CHROME) $('body').hide().show(0); //forces FF to render the animation            
             requestAnimationFrame(function() {
                 elementsToSet.css(trasformCss);
             });
@@ -938,6 +962,8 @@
             css.perspective = '800px';
             css.webkitPerspective = "800px";
             css.mozPerspective = "800px";
+            //adding this to make Edge happy
+            css['transform-style'] = 'preserve-3d';
         } else css.overflow = 'hidden';
 
         //perspective on container will give us 3d effect when flip
@@ -1087,7 +1113,7 @@
     };
 
     $ax.visibility.GetPanelStateCount = function(id) {
-        return $ax.visibility.getRealChildren($jobj(id).children()).length;
+        return $ax.visibility.getRealChildren($jobj(id).children()).filter("[id*='_state']").length;
     };
 
     var _bringPanelStateToFront = function (dpId, stateId, oldStateId, oldInFront) {
